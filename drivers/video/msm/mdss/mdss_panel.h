@@ -53,7 +53,36 @@ struct panel_id {
 #define LVDS_PANEL		11	/* LVDS */
 #define EDP_PANEL		12	/* LVDS */
 
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+/* backlight mapping table type list */
+enum lge_bl_map_type {
+	LGE_BLDFT = 0,		/* default */
+	LGE_BL = LGE_BLDFT,	/* main backlight */
+	LGE_BLHL,		/* main backlight with high luminance */
+	LGE_BL2,		/* second backlight */
+	LGE_BL2DIM,		/* second backlight with dimming */
+	LGE_BL2HL,		/* second backlight with high luminance */
+	LGE_BL2DIMHL,		/* second backlight with dimming and high luminance */
+	LGE_BLMAPMAX
+};
+
+enum lcd_panel_type {
+	LGD_R69007_INCELL_CMD_PANEL,
+	LGD_SIC_LG4945_INCELL_CMD_PANEL,
+	LGE_SIC_LG4946_INCELL_CND_PANEL,
+	LGE_TD4302_INCELL_CND_PANEL,
+	LGD_SIC_LG49407_INCELL_CMD_PANEL,
+	LGD_SIC_LG49407_INCELL_VIDEO_PANEL,
+	LGD_SIC_LG49407_1440_2880_INCELL_VIDEO_PANEL,
+	LGD_SIC_LG49408_1440_2880_INCELL_CMD_PANEL,
+	UNKNOWN_PANEL
+};
+#endif
+
 #define DSC_PPS_LEN		128
+
+/* HDR propeties count */
+#define DISPLAY_PRIMARIES_COUNT	8	/* WRGB x and y values*/
 
 static inline const char *mdss_panel2str(u32 panel)
 {
@@ -325,6 +354,14 @@ enum dynamic_switch_modes {
 	SWITCH_RESOLUTION,
 };
 
+#ifdef CONFIG_LGE_DISPLAY_BL_EXTENDED
+enum mode_switch_type {
+	CMD_TO_VIDEO= 0,
+	VIDEO_TO_CMD,
+	NO_DECISION,
+};
+#endif
+
 /**
  * struct mdss_panel_timing - structure for panel timing information
  * @list: List head ptr to track within panel data timings list
@@ -582,6 +619,19 @@ struct mdss_panel_roi_alignment {
 	u32 min_height;
 };
 
+struct mdss_panel_hdr_properties {
+	bool hdr_enabled;
+
+	/* WRGB X and y values arrayed in format */
+	/* [WX, WY, RX, RY, GX, GY, BX, BY] */
+	u32 display_primaries[DISPLAY_PRIMARIES_COUNT];
+
+	/* peak brightness supported by panel */
+	u32 peak_brightness;
+	/* Blackness level supported by panel */
+	u32 blackness_level;
+};
+
 struct mdss_panel_info {
 	u32 xres;
 	u32 yres;
@@ -609,6 +659,19 @@ struct mdss_panel_info {
 	int pwm_pmic_gpio;
 	int pwm_lpg_chan;
 	int pwm_period;
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	u32 default_brightness;
+	int panel_type;
+	int blmap_size;
+	int *blmap[LGE_BLMAPMAX];
+#if defined(CONFIG_LGE_HIGH_LUMINANCE_MODE)
+	int hl_mode_on;
+#endif
+#endif
+#if defined(CONFIG_LGE_THERMAL_BL_MAX)
+	int thermal_maxblvalue;
+#endif
+
 	bool dynamic_fps;
 	bool ulps_feature_enabled;
 	bool ulps_suspend_enabled;
@@ -715,6 +778,40 @@ struct mdss_panel_info {
 
 	/* debugfs structure for the panel */
 	struct mdss_panel_debugfs_info *debugfs_info;
+
+	/* HDR properties of display panel*/
+	struct mdss_panel_hdr_properties hdr_properties;
+
+#if defined(CONFIG_LGE_DISPLAY_AOD_SUPPORTED)
+	bool aod_init_done;
+	bool aod_labibb_ctrl;
+	unsigned int aod_cur_mode;
+	unsigned int aod_cmd_mode;
+	unsigned int aod_node_from_user;
+	unsigned int aod_keep_u2;
+	bool bl2_dimm;
+#if defined(CONFIG_LGE_DISPLAY_BL_EXTENDED)
+	int ext_off;
+	int ext_off_temp;
+	int mode_switch;
+#endif
+#endif
+
+#if defined(CONFIG_LGE_DISPLAY_MARQUEE_SUPPORTED)
+	unsigned int mq_mode;
+	unsigned int mq_direction;
+	unsigned int mq_speed;
+	struct mq_pos_data{
+		unsigned int start_x;
+		unsigned int end_x;
+		unsigned int start_y;
+		unsigned int end_y;
+	} mq_pos;
+#endif
+
+#ifdef CONFIG_LGE_LCD_POWER_CTRL
+	bool power_ctrl;
+#endif
 };
 
 struct mdss_panel_timing {
@@ -1139,4 +1236,10 @@ static inline struct mdss_panel_timing *mdss_panel_get_timing_by_name(
 		struct mdss_panel_data *pdata,
 		const char *name) { return NULL; };
 #endif
+
+#if defined(CONFIG_LGE_MIPI_H1_INCELL_QHD_CMD_PANEL)
+void lge_force_mdss_dsi_panel_cmd_read(char cmd0, int cnt, char* ret_buf);
+int lge_is_valid_U2_FTRIM_reg(void);
+#endif
+
 #endif /* MDSS_PANEL_H */

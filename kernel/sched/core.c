@@ -96,6 +96,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
+#ifdef CONFIG_DEBUG_PREEMPT
+#include <asm/cacheflush.h>
+#endif
+
 const char *task_event_names[] = {"PUT_PREV_TASK", "PICK_NEXT_TASK",
 				  "TASK_WAKE", "TASK_MIGRATE", "TASK_UPDATE",
 				"IRQ_UPDATE"};
@@ -829,6 +833,14 @@ void sched_set_cluster_dstate(const cpumask_t *cluster_cpus, int dstate,
 	cluster->dstate_wakeup_latency = wakeup_latency;
 }
 
+/* ADAPT_LGE_BMC */
+int
+sched_get_cpu_cstate(int cpu)
+{
+	struct rq *rq = cpu_rq(cpu);
+
+	return rq->cstate;
+}
 #endif /* CONFIG_SCHED_HMP */
 
 #endif /* CONFIG_SMP */
@@ -3444,6 +3456,17 @@ exit_early:
 	}
 }
 
+unsigned long sched_get_busy(int cpu)
+{
+	struct cpumask query_cpu = CPU_MASK_NONE;
+	struct sched_load busy;
+
+	cpumask_set_cpu(cpu, &query_cpu);
+	sched_get_cpus_busy(&busy, &query_cpu);
+
+	return busy.prev_load;
+}
+
 void sched_set_io_is_busy(int val)
 {
 	sched_io_is_busy = val;
@@ -5636,6 +5659,9 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
 #ifdef CONFIG_MSM_APP_SETTINGS
 	if (use_app_setting)
 		switch_app_setting_bit(prev, next);
+
+	if (use_l2_app_setting)
+		switch_l2_app_setting_bit(prev, next);
 #endif
 }
 
@@ -6073,11 +6099,19 @@ notrace unsigned long get_parent_ip(unsigned long addr)
 void preempt_count_add(int val)
 {
 #ifdef CONFIG_DEBUG_PREEMPT
+	int *pt = preempt_count_ptr();
 	/*
 	 * Underflow?
 	 */
-	if (DEBUG_LOCKS_WARN_ON((preempt_count() < 0)))
+	if (preempt_count() < 0) {
+		trace_printk(KERN_ERR "%s: %d < 0\n",
+				__func__, preempt_count());
+		__dma_flush_range((void *)&pt, (void *)&pt + (sizeof(int)));
+		trace_printk(KERN_ERR "%s: after flush %d %d \n",
+				__func__,*pt , preempt_count());
+		DEBUG_LOCKS_WARN_ON(1);
 		return;
+	}
 #endif
 	__preempt_count_add(val);
 #ifdef CONFIG_DEBUG_PREEMPT
@@ -6101,11 +6135,19 @@ NOKPROBE_SYMBOL(preempt_count_add);
 void preempt_count_sub(int val)
 {
 #ifdef CONFIG_DEBUG_PREEMPT
+	int *pt = preempt_count_ptr();
 	/*
 	 * Underflow?
 	 */
-	if (DEBUG_LOCKS_WARN_ON(val > preempt_count()))
+	if (val > preempt_count()) {
+		trace_printk(KERN_ERR "%s: %d > %d\n",
+				__func__, val, preempt_count());
+		__dma_flush_range((void *)&pt, (void *)&pt + (sizeof(int)));
+		trace_printk(KERN_ERR "%s: after flush %d %d \n",
+				__func__,*pt, preempt_count());
+		DEBUG_LOCKS_WARN_ON(1);
 		return;
+	}
 	/*
 	 * Is the spinlock portion underflowing?
 	 */

@@ -90,6 +90,7 @@
 #define HW_CURSOR_STAGE(mdata) \
 	(((mdata)->max_target_zorder + MDSS_MDP_STAGE_0) - 1)
 
+#define QCT_MM_NOC_PATCH /*temp patch for MM NOC error SR#02184707*/
 #define BITS_TO_BYTES(x) DIV_ROUND_UP(x, BITS_PER_BYTE)
 
 enum mdss_mdp_perf_state_type {
@@ -195,9 +196,13 @@ enum mdss_mdp_csc_type {
 	MDSS_MDP_CSC_YUV2RGB_601L,
 	MDSS_MDP_CSC_YUV2RGB_601FR,
 	MDSS_MDP_CSC_YUV2RGB_709L,
+	MDSS_MDP_CSC_YUV2RGB_2020L,
+	MDSS_MDP_CSC_YUV2RGB_2020FR,
 	MDSS_MDP_CSC_RGB2YUV_601L,
 	MDSS_MDP_CSC_RGB2YUV_601FR,
 	MDSS_MDP_CSC_RGB2YUV_709L,
+	MDSS_MDP_CSC_RGB2YUV_2020L,
+	MDSS_MDP_CSC_RGB2YUV_2020FR,
 	MDSS_MDP_CSC_YUV2YUV,
 	MDSS_MDP_CSC_RGB2RGB,
 	MDSS_MDP_MAX_CSC
@@ -1152,6 +1157,7 @@ static inline int mdss_mdp_get_wb_ctl_support(struct mdss_data_type *mdata,
 	 * The initial control paths can be used by Primary, External and WB.
 	 * The rotator can use the remaining available control paths.
 	 */
+
 	return rotator_session ? (mdata->nctl - mdata->nmixers_wb) :
 		MDSS_MDP_CTL0;
 }
@@ -1273,6 +1279,10 @@ static inline uint8_t pp_vig_csc_pipe_val(struct mdss_mdp_pipe *pipe)
 		return MDSS_MDP_CSC_YUV2RGB_601L;
 	case MDP_CSC_ITU_R_601_FR:
 		return MDSS_MDP_CSC_YUV2RGB_601FR;
+	case MDP_CSC_ITU_R_2020:
+		return MDSS_MDP_CSC_YUV2RGB_2020L;
+	case MDP_CSC_ITU_R_2020_FR:
+		return MDSS_MDP_CSC_YUV2RGB_2020FR;
 	case MDP_CSC_ITU_R_709:
 	default:
 		return  MDSS_MDP_CSC_YUV2RGB_709L;

@@ -2589,6 +2589,9 @@ static void hcd_release(struct kref *kref)
 
 	mutex_lock(&usb_port_peer_mutex);
 	if (hcd->primary_hcd == hcd)
+#ifdef CONFIG_LGE_USB_G_ANDROID
+		if (!hcd->shared_hcd)
+#endif
 		kfree(hcd->bandwidth_mutex);
 	if (hcd->shared_hcd) {
 		struct usb_hcd *peer = hcd->shared_hcd;
@@ -2599,6 +2602,9 @@ static void hcd_release(struct kref *kref)
 	}
 	mutex_unlock(&usb_port_peer_mutex);
 	kfree(hcd);
+#ifdef CONFIG_LGE_USB_G_ANDROID
+	hcd = NULL;
+#endif
 }
 
 struct usb_hcd *usb_get_hcd (struct usb_hcd *hcd)
@@ -2925,7 +2931,8 @@ void usb_remove_hcd(struct usb_hcd *hcd)
 #ifdef CONFIG_PM_RUNTIME
 	cancel_work_sync(&hcd->wakeup_work);
 #endif
-
+	/* handle any pending hub events before XHCI stops */
+	usb_flush_hub_wq();
 	mutex_lock(&usb_bus_list_lock);
 	usb_disconnect(&rhdev);		/* Sets rhdev to NULL */
 	mutex_unlock(&usb_bus_list_lock);

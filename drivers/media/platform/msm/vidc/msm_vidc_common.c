@@ -22,6 +22,7 @@
 #include "vidc_hfi_api.h"
 #include "msm_vidc_debug.h"
 #include "msm_vidc_dcvs.h"
+#include "msm_vdec.h"
 
 #define IS_ALREADY_IN_STATE(__p, __d) ({\
 	int __rc = (__p >= __d);\
@@ -1194,12 +1195,14 @@ static void handle_event_change(enum hal_command_response cmd, void *data)
 	 * ptr[2] = flag to indicate bit depth or/and pic struct changed
 	 * ptr[3] = bit depth
 	 * ptr[4] = pic struct (progressive or interlaced)
+	 * ptr[5] = colour space
 	 */
 
 	ptr = (u32 *)seq_changed_event.u.data;
 	ptr[2] = 0x0;
 	ptr[3] = inst->bit_depth;
 	ptr[4] = inst->pic_struct;
+	ptr[5] = inst->colour_space;
 
 	if (inst->bit_depth != event_notify->bit_depth) {
 		inst->bit_depth = event_notify->bit_depth;
@@ -1207,17 +1210,33 @@ static void handle_event_change(enum hal_command_response cmd, void *data)
 		ptr[3] = inst->bit_depth;
 		event = V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT;
 		dprintk(VIDC_DBG,
-			"V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT due to bit-depth change\n");
+				"V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT due to bit-depth change\n");
 	}
 
+#ifdef CONFIG_MACH_LGE
+	    if (inst->pic_struct != event_notify->pic_struct && !((inst->flags & VIDC_SECURE) && (inst->fmts[OUTPUT_PORT]->fourcc == V4L2_PIX_FMT_MPEG2))){
+//[S][LGDTV][isdbt-fwk@lge.com] Conditions are added to check if instance is secure and mpeg2
+#else
 	if (inst->fmts[CAPTURE_PORT]->fourcc == V4L2_PIX_FMT_NV12 &&
 		inst->pic_struct != event_notify->pic_struct) {
+#endif
 		inst->pic_struct = event_notify->pic_struct;
 		event = V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT;
 		ptr[2] |= V4L2_EVENT_PICSTRUCT_FLAG;
 		ptr[4] = inst->pic_struct;
 		dprintk(VIDC_DBG,
-			"V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT due to pic-struct change\n");
+				"V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT due to pic-struct change\n");
+	}
+
+	if (inst->bit_depth == MSM_VIDC_BIT_DEPTH_10
+		&& inst->colour_space !=
+		event_notify->colour_space) {
+		inst->colour_space = event_notify->colour_space;
+		event = V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT;
+		ptr[2] |= V4L2_EVENT_COLOUR_SPACE_FLAG;
+		ptr[5] = inst->colour_space;
+		dprintk(VIDC_DBG,
+				"V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT due to colour space change\n");
 	}
 
 	if (event == V4L2_EVENT_SEQ_CHANGED_INSUFFICIENT) {
@@ -3891,6 +3910,7 @@ int msm_comm_try_get_bufreqs(struct msm_vidc_inst *inst)
 	dprintk(VIDC_PROF, "Input buffers: %d, Output buffers: %d\n",
 			inst->buff_req.buffer[0].buffer_count_actual,
 			inst->buff_req.buffer[1].buffer_count_actual);
+
 	return rc;
 }
 

@@ -50,8 +50,13 @@ const char *usbcore_name = "usbcore";
 static bool nousb;	/* Disable USB when built into kernel image */
 
 #ifdef	CONFIG_PM_RUNTIME
-static int usb_autosuspend_delay = 2;		/* Default delay value,
+#ifdef CONFIG_LGE_USB_G_ANDROID
+static int usb_autosuspend_delay = -1;		/* Default delay value,
 						 * in seconds */
+#else
+static int usb_autosuspend_delay = 2;          /* Default delay value,
+						 * in seconds */
+#endif
 module_param_named(autosuspend, usb_autosuspend_delay, int, 0644);
 MODULE_PARM_DESC(autosuspend, "default autosuspend delay");
 
@@ -668,9 +673,6 @@ EXPORT_SYMBOL(usb_sec_event_ring_setup);
 int usb_sec_event_ring_cleanup(struct usb_device *dev,
 	unsigned intr_num)
 {
-	if (dev->state == USB_STATE_NOTATTACHED)
-		return 0;
-
 	return usb_hcd_sec_event_ring_cleanup(dev, intr_num);
 }
 EXPORT_SYMBOL(usb_sec_event_ring_cleanup);
