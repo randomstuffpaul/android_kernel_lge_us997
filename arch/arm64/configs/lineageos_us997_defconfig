@@ -4306,7 +4306,7 @@ CONFIG_BT_V4L2=y
 #
 # TouchSense driver support
 #
-CONFIG_TSPDRV=y
+# CONFIG_TSPDRV is not set
 
 #
 # Firmware Drivers
