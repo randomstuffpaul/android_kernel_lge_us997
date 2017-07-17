@@ -207,6 +207,9 @@ static int debug_shrinker_show(struct seq_file *s, void *unused)
 	struct shrinker *shrinker;
 	struct shrink_control sc;
 
+	if (nr_node_ids == 1)
+		sc.nid = 0;
+
 	sc.gfp_mask = -1;
 	sc.nr_to_scan = 0;
 
@@ -1228,7 +1231,7 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 
 	list_for_each_entry_safe(page, next, page_list, lru) {
 		if (page_is_file_cache(page) && !PageDirty(page) &&
-		    !isolated_balloon_page(page)) {
+		    !__PageMovable(page)) {
 			ClearPageActive(page);
 			list_move(&page->lru, &clean_pages);
 		}
@@ -2696,6 +2699,9 @@ static bool pfmemalloc_watermark_ok(pg_data_t *pgdat)
 
 		pfmemalloc_reserve += min_wmark_pages(zone);
 		free_pages += zone_page_state(zone, NR_FREE_PAGES);
+#ifdef CONFIG_MIGRATE_HIGHORDER
+		free_pages -= zone_page_state(zone, NR_FREE_HIGHORDER_PAGES);
+#endif
 	}
 
 	/* If there are no reserves (unexpected config) then do not throttle */
